@@ -52,7 +52,7 @@ class FlaskError:
 
     def api(self):
         ''' handle queries to error route '''
-        return 'TONS OF ERRORS'
+        return self._db.get_errors_json()
 
 
 
@@ -86,7 +86,7 @@ class ErrorDb:
 
         sqlcheck = "SELECT name FROM sqlite_master WHERE type='table' AND name='errors'"
         sqlcreate = 'CREATE TABLE errors(id integer primary key, \
-                     type text, timestamp text, stacktrace text)'
+                     type text, timestamp text, stacktrace text)' # ADD TEXT TEXT ><
 
         cursor.execute(sqlcheck)
         if not cursor.fetchall():
@@ -94,13 +94,16 @@ class ErrorDb:
 
     @_cursor
     def store_error(self, cursor, error):
-        sql_insert = 'INSERT INTO errors VALUES (?, ?, ?, ?)'
+        sql_insert = 'INSERT INTO errors VALUES (NULL, ?, ?, ?)'
 
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
+        cursor.execute(sql_insert, (error.__class__.__name__, timestamp, str(error)))
 
     @_cursor
-    def get_errors_json(self, cursor, error):
-        pass
+    def get_errors_json(self, cursor):
+        sqlget = ''' SELECT * FROM errors '''
+        cursor.execute(sqlget)
+        for x in cursor.fetchall():
+            return str(x)
 
 
