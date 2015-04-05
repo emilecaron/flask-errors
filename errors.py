@@ -1,14 +1,19 @@
 # -*- coding: utf8 -*-
+
 '''
 flask-error module
 a persistant storage for flask app errors
 with easy access and no external dependency
 '''
 
-import sqlite3
+import sys
+import io
 import json
+import sqlite3
+import traceback
 from datetime import datetime
 from functools import wraps
+
 
 class FlaskError:
     '''
@@ -48,7 +53,7 @@ class FlaskError:
         ''' Handle any exception '''
         print('Handling', error, type(error))
 
-        self._db.store_error(error)
+        self._db.store_error(*sys.exc_info())
 
         # Propagate exception
         raise error
@@ -62,7 +67,7 @@ class FlaskError:
 def _cursor(func):
     '''
     Provide a cusor and commit to a method
-    Requires the instance to have a db_file attribute
+    Requires the class/instance to have a db_file attribute
     '''
 
     @wraps(func)
@@ -83,9 +88,8 @@ class ErrorDb:
     Exposes methods for error storage
 
     An exception is stored using the following schema:
-        - timestamp: when the exception was caught
-        - type: exception class name
-        - args: arguments the exception was raised with
+      id, timestamp, type, value, traceback
+
     '''
     db_file = None
 
@@ -98,28 +102,26 @@ class ErrorDb:
         ''' Create required table if missing '''
 
         sqlcheck = "SELECT name FROM sqlite_master WHERE type='table' AND name='errors'"
-        sqlcreate = 'CREATE TABLE errors(id integer primary key, ts timestamp, \
-                                         type text, args text)'
+        sqlcreate = 'CREATE TABLE errors(id integer primary key, timestamp timestamp, \
+                                         type text, value text, traceback text)'
 
         cursor.execute(sqlcheck)
         if not cursor.fetchall():
             cursor.execute(sqlcreate)
 
     @_cursor
-    def store_error(self, cursor, error):
+    def store_error(self, cursor, exc_type, exc_value, exc_traceback):
         ''' Extract data from error and store it'''
-        values = (
-            datetime.now(),
-            error.__class__.__name__,
-            str(error.args),
-        )
-        sql_insert = 'INSERT INTO errors VALUES (NULL, ?, ?, ?)'
+        traceback_io = io.StringIO()
+        traceback.print_tb(exc_traceback, file=traceback_io)
+        values = (datetime.now(), str(exc_type), str(exc_value), traceback_io.getvalue())
+        sql_insert = 'INSERT INTO errors VALUES (NULL, ?, ?, ?, ?)'
         cursor.execute(sql_insert, values)
 
     @_cursor
     def get_errors_json(self, cursor):
         ''' Get the json data associated with the error'''
-        sqlget = 'SELECT id, ts, type, args FROM errors'
+        sqlget = 'SELECT * FROM errors'
         cursor.execute(sqlget)
         return json.dumps([e for e in cursor.fetchall()])
 
