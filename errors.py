@@ -81,6 +81,11 @@ class ErrorDb:
     '''
     Interface to the sqlite database
     Exposes methods for error storage
+
+    An exception is stored using the following schema:
+        - timestamp: when the exception was caught
+        - type: exception class name
+        - args: arguments the exception was raised with
     '''
     db_file = None
 
@@ -93,8 +98,8 @@ class ErrorDb:
         ''' Create required table if missing '''
 
         sqlcheck = "SELECT name FROM sqlite_master WHERE type='table' AND name='errors'"
-        sqlcreate = 'CREATE TABLE errors(id integer primary key, \
-                     type text, timestamp text, stacktrace text)' # ADD TEXT TEXT ><
+        sqlcreate = 'CREATE TABLE errors(id integer primary key, ts timestamp, \
+                                         type text, args text)'
 
         cursor.execute(sqlcheck)
         if not cursor.fetchall():
@@ -102,15 +107,20 @@ class ErrorDb:
 
     @_cursor
     def store_error(self, cursor, error):
+        ''' Extract data from error and store it'''
+        values = (
+            datetime.now(),
+            error.__class__.__name__,
+            str(error.args),
+        )
         sql_insert = 'INSERT INTO errors VALUES (NULL, ?, ?, ?)'
-
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        cursor.execute(sql_insert, (error.__class__.__name__, timestamp, str(error)))
+        cursor.execute(sql_insert, values)
 
     @_cursor
     def get_errors_json(self, cursor):
-        sqlget = ''' SELECT * FROM errors '''
+        ''' Get the json data associated with the error'''
+        sqlget = 'SELECT id, ts, type, args FROM errors'
         cursor.execute(sqlget)
-        return json.dumps([str(x) for x in cursor.fetchall()])
+        return json.dumps([e for e in cursor.fetchall()])
 
 
