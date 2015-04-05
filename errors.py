@@ -1,15 +1,18 @@
 # -*- coding: utf8 -*-
 '''
 flask-error module
+a persistant storage for flask app errors
+with easy access and no external dependency
 '''
 
+import sqlite3
+import json
 from datetime import datetime
 from functools import wraps
-import sqlite3
 
 class FlaskError:
     '''
-        The FlaskError extension.
+        The FlaskError class
 
         Use it this way:
             app = Flask(__name__)
@@ -57,13 +60,18 @@ class FlaskError:
 
 
 def _cursor(func):
-    ''' Provide a cusor and commit to a method '''
+    '''
+    Provide a cusor and commit to a method
+    Requires the instance to have a db_file attribute
+    '''
 
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        cursor = self._conn.cursor()
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
         ret = func(self, cursor, *args, **kwargs)
-        self._conn.commit()
+        conn.commit()
+        conn.close()
         return ret
 
     return wrapper
@@ -74,10 +82,10 @@ class ErrorDb:
     Interface to the sqlite database
     Exposes methods for error storage
     '''
-    _conn = None
+    db_file = None
 
     def __init__(self, db_file):
-        self._conn = sqlite3.connect(db_file)
+        self.db_file = db_file
         self._seed()
 
     @_cursor
@@ -103,7 +111,6 @@ class ErrorDb:
     def get_errors_json(self, cursor):
         sqlget = ''' SELECT * FROM errors '''
         cursor.execute(sqlget)
-        for x in cursor.fetchall():
-            return str(x)
+        return json.dumps([str(x) for x in cursor.fetchall()])
 
 

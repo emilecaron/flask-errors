@@ -18,4 +18,5 @@ def hello_world():
     raise Hello('World')
 
 if __name__ == '__main__':
-    app.run()
+    #app.run(debug=True)
+    app.run(debug=False)
