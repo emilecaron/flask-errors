@@ -1,1 +1,19 @@
-Hello Ui
+<!doctype html>
+<title>Flask error</title>
+
+<table>
+    <tr>
+        <th>id</th>
+        <th>time</th>
+        <th>type</th>
+        <th>value</th>
+    </tr>
+    {% for error in errors %}
+    <tr>
+        <td>{{ error.id }}</td>
+        <td>{{ error.timestamp }}</td>
+        <td>{{ error.type }}</td>
+        <td>{{ error.value }}</td>
+    </tr>
+    {% endfor %}
+</table>

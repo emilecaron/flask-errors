@@ -70,7 +70,7 @@ class FlaskError:
         returns the list of errors in the database as json data
         '''
         limit = request.args.get('limit', 10)
-        return self._db.get_errors_json(limit)
+        return json.dumps(self._db.get_errors(limit))
 
     def ui(self):
         '''
@@ -80,7 +80,8 @@ class FlaskError:
         # open file manually since flask app can only have a single template folder
         with open('ui.html', 'r') as tpl_file:
             tpl = tpl_file.read()
-            return render_template_string(tpl)
+            errors = self._db.get_errors(100)
+            return render_template_string(tpl, errors=errors)
 
 
 def _cursor(func):
@@ -143,11 +144,11 @@ class ErrorDb:
         cursor.execute(sql_insert, values)
 
     @_cursor
-    def get_errors_json(self, cursor, limit=10):
-        ''' Get the json data associated with the error'''
+    def get_errors(self, cursor, limit=10):
+        ''' Get the data associated with the error'''
         sqlget = 'SELECT * FROM errors ORDER BY timestamp DESC LIMIT ? '
         cursor.execute(sqlget, (limit,))
-        return json.dumps([self._build_json(e) for e in cursor.fetchall()])
+        return [self._build_json(e) for e in cursor.fetchall()]
 
     def _build_json(self, row):
         ''' return a json obj from a row result '''
