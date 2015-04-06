@@ -1,7 +1,8 @@
 <!doctype html>
 <title>Flask error</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
 
-<table>
+<table class="table table-striped">
     <tr>
         <th>id</th>
         <th>time</th>
@@ -10,7 +11,7 @@
     </tr>
     {% for error in errors %}
     <tr>
-        <td>{{ error.id }}</td>
+        <td><a href="/errors_ui/error/{{ error.id }}">{{ error.id }}</a></td>
         <td>{{ error.timestamp }}</td>
         <td>{{ error.type }}</td>
         <td>{{ error.value }}</td>

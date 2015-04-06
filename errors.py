@@ -14,7 +14,7 @@ import traceback
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import request, render_template_string
+from flask import request, abort, render_template_string
 
 
 class FlaskError:
@@ -27,7 +27,7 @@ class FlaskError:
 
     '''
 
-    def __init__(self, app=None, db_file='errors.db', expire=timedelta(days=10), **kwargs):
+    def __init__(self, app=None, db_file=None, expire=timedelta(days=10), **kwargs):
         '''
             Initialize FlaskError
 
@@ -38,12 +38,12 @@ class FlaskError:
             ui_route: optional url to enable FaskError ui route
         '''
 
+        db_file = db_file or  app.root_path + '/errors.db'
+        self._db = ErrorDb(db_file)
+        self.expire = expire
+
         if app is not None:
             self.init_app(app, **kwargs)
-
-        self.expire = expire
-        self._db = ErrorDb(db_file)
-
 
     def init_app(self, app, errors_route='/errors', ui_route='/errors_ui'):
 
@@ -56,7 +56,8 @@ class FlaskError:
 
         # Register UI route
         if ui_route is not None:
-            app.route(ui_route, methods=['GET'])(self.ui)
+            app.route(ui_route, methods=['GET'])(self.ui_root)
+            app.route(ui_route + '/error/<int:error_id>', methods=['GET'])(self.ui_error)
 
     def handler(self, error):
         ''' Handle any exception and propagate '''
@@ -72,16 +73,27 @@ class FlaskError:
         limit = request.args.get('limit', 10)
         return json.dumps(self._db.get_errors(limit))
 
-    def ui(self):
+    def ui_root(self):
         '''
-        handles queries to ui route
-        renders ui template
+        handles queries to ui default route
+        renders root template
         '''
-        # open file manually since flask app can only have a single template folder
-        with open('ui.html', 'r') as tpl_file:
+        with open('root.html', 'r') as tpl_file:
             tpl = tpl_file.read()
             errors = self._db.get_errors(100)
             return render_template_string(tpl, errors=errors)
+
+    def ui_error(self, error_id):
+        '''
+        handles queries to specific error route
+        renders error template
+        '''
+        error = self._db.get_error(error_id)
+        if not error:
+            abort(404)
+        with open('error.html', 'r') as tpl_file:
+            tpl = tpl_file.read()
+            return render_template_string(tpl, error=error)
 
 
 def _cursor(func):
@@ -149,6 +161,14 @@ class ErrorDb:
         sqlget = 'SELECT * FROM errors ORDER BY timestamp DESC LIMIT ? '
         cursor.execute(sqlget, (limit,))
         return [self._build_json(e) for e in cursor.fetchall()]
+
+    @_cursor
+    def get_error(self, cursor, error_id):
+        ''' Get the data associated with a specific error'''
+        sqlget = 'SELECT * FROM errors WHERE id=? '
+        cursor.execute(sqlget, (error_id,))
+        data = cursor.fetchone()
+        return self._build_json(data) if data else None
 
     def _build_json(self, row):
         ''' return a json obj from a row result '''

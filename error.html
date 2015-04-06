@@ -1,0 +1,18 @@
+<!doctype html>
+<title>Flask Error</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+
+<h1>Error {{ error.id }}</h1>
+<h4>Timestamp</h4>
+<p>{{ error.timestamp }}</p>
+<h4>Type</h4>
+<p><code>{{ error.type }}</code></p>
+<h4>Value</h4>
+<p>{{ error.value }}</p>
+<h4>Traceback</h4>
+<table class='table table-striped'>
+{% for line in error.traceback.split('\n') %}
+<tr><td>{{ line }}</td></tr>
+{% endfor %}
+</table>
+<a href="/errors_ui">back</a>
