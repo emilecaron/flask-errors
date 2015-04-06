@@ -14,7 +14,7 @@ import traceback
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import request
+from flask import request, render_template_string
 
 
 class FlaskError:
@@ -34,7 +34,8 @@ class FlaskError:
             app: the Flask app instance
             db_file: the file to use as an sqlite database, or :memory:
             expire: timedelta, exceptions past this date will be removed
-            errors_route: optional url enable FlaskError api route 
+            errors_route: optional url to enable FlaskError api route 
+            ui_route: optional url to enable FaskError ui route
         '''
 
         if app is not None:
@@ -44,7 +45,7 @@ class FlaskError:
         self._db = ErrorDb(db_file)
 
 
-    def init_app(self, app, errors_route='/errors'):
+    def init_app(self, app, errors_route='/errors', ui_route='/errors_ui'):
 
         # Register base handler
         app.errorhandler(BaseException)(self.handler)
@@ -52,6 +53,10 @@ class FlaskError:
         # Register api route
         if errors_route is not None:
             app.route(errors_route, methods=['GET'])(self.api)
+
+        # Register UI route
+        if ui_route is not None:
+            app.route(ui_route, methods=['GET'])(self.ui)
 
     def handler(self, error):
         ''' Handle any exception and propagate '''
@@ -66,6 +71,16 @@ class FlaskError:
         '''
         limit = request.args.get('limit', 10)
         return self._db.get_errors_json(limit)
+
+    def ui(self):
+        '''
+        handles queries to ui route
+        renders ui template
+        '''
+        # open file manually since flask app can only have a single template folder
+        with open('ui.html', 'r') as tpl_file:
+            tpl = tpl_file.read()
+            return render_template_string(tpl)
 
 
 def _cursor(func):
