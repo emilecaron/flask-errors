@@ -10,8 +10,8 @@
         <th>value</th>
     </tr>
     {% for error in errors %}
-    <tr>
-        <td><a href="/errors_ui/error/{{ error.id }}">{{ error.id }}</a></td>
+    <tr onclick="document.location = '/errors_ui/error/{{ error.id }}';">
+        <td>{{ error.id }}</td>
         <td>{{ error.timestamp }}</td>
         <td>{{ error.type }}</td>
         <td>{{ error.value }}</td>
