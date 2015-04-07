@@ -7,6 +7,7 @@ with easy access and no external dependency
 '''
 
 import sys
+import os
 import io
 import json
 import sqlite3
@@ -16,6 +17,8 @@ from functools import wraps
 
 from flask import request, abort, render_template_string
 
+
+module_dir = os.path.dirname(__file__)
 
 class FlaskError:
     '''
@@ -78,7 +81,7 @@ class FlaskError:
         handles queries to ui default route
         renders root template
         '''
-        with open('root.html', 'r') as tpl_file:
+        with open(module_dir + '/root.html', 'r') as tpl_file:
             tpl = tpl_file.read()
             errors = self._db.get_errors(100)
             return render_template_string(tpl, errors=errors)
@@ -91,7 +94,7 @@ class FlaskError:
         error = self._db.get_error(error_id)
         if not error:
             abort(404)
-        with open('error.html', 'r') as tpl_file:
+        with open(module_dir + '/error.html', 'r') as tpl_file:
             tpl = tpl_file.read()
             return render_template_string(tpl, error=error)
 
