@@ -49,6 +49,8 @@ class FlaskError:
             self.init_app(app, **kwargs)
 
     def init_app(self, app, errors_route='/errors', ui_route='/errors_ui'):
+        # Propagate exceptions
+        app.config['PROPAGATE_EXCEPTIONS'] = True
 
         # Register base handler
         app.errorhandler(BaseException)(self.handler)
