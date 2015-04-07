@@ -49,6 +49,9 @@ class FlaskError:
             self.init_app(app, **kwargs)
 
     def init_app(self, app, errors_route='/errors', ui_route='/errors_ui'):
+
+        self.app_name = app.name
+
         # Propagate exceptions
         app.config['PROPAGATE_EXCEPTIONS'] = True
 
@@ -86,7 +89,7 @@ class FlaskError:
         with open(module_dir + '/root.html', 'r') as tpl_file:
             tpl = tpl_file.read()
             errors = self._db.get_errors(100)
-            return render_template_string(tpl, errors=errors)
+            return render_template_string(tpl, errors=errors, app=self.app_name)
 
     def ui_error(self, error_id):
         '''
