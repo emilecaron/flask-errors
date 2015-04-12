@@ -23,4 +23,7 @@ See full example in provided app.py file
 None. This extension will run on a clean python3 + flask install.
 The provided UI uses Bootstrap through the official CDNs.
 
+# Next steps
+Stats module
+https://packaging.python.org/en/latest/distributing.html#initial-files
 
