@@ -16,6 +16,7 @@ See full example in provided app.py file
 
 # Default settings
 * UI is available at /errors_ui
+![flask-error](https://raw.github.com/emilecaron/flask-errors/master/screenshot.png)
 * REST endpoint is available at /errors
 * Errors are stored for 10 days
 
