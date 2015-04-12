@@ -6,9 +6,9 @@ A simple flask extension for out of the box error management
 * Provide a simple UI with error list and details
 * Provide a rest endpoint to the errors data
 * Provide a substitution errohandler system for flask, with:
-** best handler selection mecanism, based on inheritence level
-** handler chaining: the next best handler is triggered if the first one raises
-** handler status displayed in the ui
+ * best handler selection mecanism, based on inheritence level
+ * handler chaining: the next best handler is triggered if the first one raises
+ * handler status displayed in the ui
 
 # How to use
 Two extra lines are required in your flask application:
