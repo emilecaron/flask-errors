@@ -21,6 +21,7 @@ def exception(error):
 
 @app.errorhandler(HomemadeError)
 def sweet_exception(error):
+    raise error
     return "500 have a nice day"
 
 

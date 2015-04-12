@@ -84,11 +84,11 @@ class FlaskError:
 
     def proxy_handler(self, error):
         ''' Handle any exception and call handlers '''
-        self._db.store_error(*sys.exc_info())
+        error_id = self._db.store_error(*sys.exc_info())
         self._db.expire(datetime.now() - self.expire)
-        return self.handle_error(error)
+        return self.handle_error(error, error_id)
 
-    def handle_error(self, error):
+    def handle_error(self, error, error_id):
         ''' Call best handlers until one returns '''
         valid_handlers = {
                 e: h 
@@ -103,9 +103,14 @@ class FlaskError:
 
         for cls in best_handlers:
             try:
-                return self._handlers[cls](error)
+                handler = self._handlers[cls]
+                self._db.store_handler_call(handler.__name__, error_id)
+                return handler(error)
             except type(error):
                 continue
+
+        # raise while work in progress
+        self._db.store_handler_call('InternalServerError', error_id)
         return InternalServerError()
 
     def api(self):
@@ -183,7 +188,7 @@ class ErrorDb:
 
         sqlcheck = "SELECT name FROM sqlite_master WHERE type='table' AND name='errors'"
         sqlcreate = 'CREATE TABLE errors(id integer primary key, timestamp timestamp, \
-                                         type text, value text, traceback text)'
+                                         type text, value text, traceback text, handlers text)'
 
         cursor.execute(sqlcheck)
         if not cursor.fetchall():
@@ -195,8 +200,23 @@ class ErrorDb:
         traceback_io = io.StringIO()
         traceback.print_tb(exc_traceback, file=traceback_io)
         values = (datetime.now(), exc_type.__name__, str(exc_value), traceback_io.getvalue())
-        sql_insert = 'INSERT INTO errors VALUES (NULL, ?, ?, ?, ?)'
+
+        sql_insert = 'INSERT INTO errors VALUES (NULL, ?, ?, ?, ?, "[]")'
         cursor.execute(sql_insert, values)
+
+        # This is not safe with race conditions
+        return cursor.lastrowid
+
+    @_cursor
+    def store_handler_call(self, cursor, handler_name, error_id):
+        sql = 'UPDATE errors SET handlers = ? WHERE id = ?'
+
+        error = self.get_error(error_id)
+        handlers = error['handlers']
+        handlers.append(handler_name)
+
+        cursor.execute(sql, (json.dumps(handlers), error_id))
+
 
     @_cursor
     def get_errors(self, cursor, limit=10):
@@ -215,13 +235,14 @@ class ErrorDb:
 
     def _build_json(self, row):
         ''' return a json obj from a row result '''
-        key, timestamp, exc_type, value, traceback = row
+        key, timestamp, exc_type, value, traceback, handlers = row
         return {
             'id': key,
             'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             'type': exc_type,
             'value': value,
             'traceback': traceback,
+            'handlers': json.loads(handlers),
         }
 
     @_cursor
