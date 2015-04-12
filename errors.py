@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import request, abort, render_template_string
+from werkzeug.exceptions import InternalServerError
 
 
 module_dir = os.path.dirname(__file__)
@@ -29,6 +30,9 @@ class FlaskError:
             FlaskError(app)
 
     '''
+
+    # Substitute Flask handler storage
+    _handlers = {}
 
     def __init__(self, app=None, db_file=None, expire=timedelta(days=10), **kwargs):
         '''
@@ -55,8 +59,11 @@ class FlaskError:
         # Propagate exceptions
         app.config['PROPAGATE_EXCEPTIONS'] = True
 
-        # Register base handler
-        app.errorhandler(BaseException)(self.handler)
+        # Register proxy handler
+        app.errorhandler(BaseException)(self.proxy_handler)
+
+        # Substitute flask errorhandler
+        app.errorhandler = self._errorhandler
 
         # Register api route
         if errors_route is not None:
@@ -67,11 +74,39 @@ class FlaskError:
             app.route(ui_route, methods=['GET'])(self.ui_root)
             app.route(ui_route + '/error/<int:error_id>', methods=['GET'])(self.ui_error)
 
-    def handler(self, error):
-        ''' Handle any exception and propagate '''
+
+    def _errorhandler(self, exception):
+        def decorator(func):
+            self._handlers[exception] = func
+            return func
+        return decorator
+
+
+    def proxy_handler(self, error):
+        ''' Handle any exception and call handlers '''
         self._db.store_error(*sys.exc_info())
         self._db.expire(datetime.now() - self.expire)
-        raise error
+        return self.handle_error(error)
+
+    def handle_error(self, error):
+        ''' Call best handlers until one returns '''
+        valid_handlers = {
+                e: h 
+                for (e, h) in self._handlers.items()
+                if isinstance(error, e)}
+
+        def key(cls):
+            ''' Get inheritance level '''
+            return type(error).mro().index(cls)
+
+        best_handlers = sorted(valid_handlers.keys(), key=key)
+
+        for cls in best_handlers:
+            try:
+                return self._handlers[cls](error)
+            except type(error):
+                continue
+        return InternalServerError()
 
     def api(self):
         '''

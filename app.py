@@ -21,7 +21,6 @@ def exception(error):
 
 @app.errorhandler(HomemadeError)
 def sweet_exception(error):
-    raise error
     return "500 have a nice day"
 
 
@@ -36,4 +35,4 @@ def better():
 
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=True)

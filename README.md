@@ -5,6 +5,9 @@ A simple flask extension for out of the box error management
 * Store any error in a local persistant sqlite database
 * Provide a simple UI with error list and details
 * Provide a rest endpoint to the errors data
+* Provide a substitution errohandler system for flask, with:
+** best handler selection mecanism, based on inheritence level
+** handler chaining: the next best handler is triggered if the first one raises
 
 # How to use
 Two extra lines are required in your flask application:
