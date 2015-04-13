@@ -76,6 +76,8 @@ class FlaskError:
 
 
     def _errorhandler(self, exception):
+        ''' Replace flask errorhandler decorator '''
+        # TODO: allow register by status code (see what flask does in detail)
         def decorator(func):
             self._handlers[exception] = func
             return func
@@ -90,17 +92,15 @@ class FlaskError:
 
     def handle_error(self, error, error_id):
         ''' Call best handlers until one returns '''
-        valid_handlers = {
-                e: h 
-                for (e, h) in self._handlers.items()
-                if isinstance(error, e)}
 
-        def key(cls):
+        def class_distance(cls):
             ''' Get inheritance level '''
             return type(error).mro().index(cls)
 
-        best_handlers = sorted(valid_handlers.keys(), key=key)
+        valid_handlers = [cls for cls in self._handlers.keys() if isinstance(error, cls)]
+        best_handlers = sorted(valid_handlers, key=class_distance)
 
+        # Call handlers until one passes
         for cls in best_handlers:
             try:
                 handler = self._handlers[cls]
@@ -109,7 +109,7 @@ class FlaskError:
             except type(error):
                 continue
 
-        # raise while work in progress
+        # Default to InternalServerError (like flask)
         self._db.store_handler_call('InternalServerError', error_id)
         return InternalServerError()
 
