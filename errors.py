@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import request, abort, render_template_string
+from werkzeug.exceptions import InternalServerError
 
 
 module_dir = os.path.dirname(__file__)
@@ -29,6 +30,9 @@ class FlaskError:
             FlaskError(app)
 
     '''
+
+    # Substitute Flask handler storage
+    _handlers = {}
 
     def __init__(self, app=None, db_file=None, expire=timedelta(days=10), **kwargs):
         '''
@@ -55,8 +59,11 @@ class FlaskError:
         # Propagate exceptions
         app.config['PROPAGATE_EXCEPTIONS'] = True
 
-        # Register base handler
-        app.errorhandler(BaseException)(self.handler)
+        # Register proxy handler
+        app.errorhandler(BaseException)(self.proxy_handler)
+
+        # Substitute flask errorhandler
+        app.errorhandler = self._errorhandler
 
         # Register api route
         if errors_route is not None:
@@ -67,11 +74,44 @@ class FlaskError:
             app.route(ui_route, methods=['GET'])(self.ui_root)
             app.route(ui_route + '/error/<int:error_id>', methods=['GET'])(self.ui_error)
 
-    def handler(self, error):
-        ''' Handle any exception and propagate '''
-        self._db.store_error(*sys.exc_info())
+
+    def _errorhandler(self, exception):
+        ''' Replace flask errorhandler decorator '''
+        # TODO: allow register by status code (see what flask does in detail)
+        def decorator(func):
+            self._handlers[exception] = func
+            return func
+        return decorator
+
+
+    def proxy_handler(self, error):
+        ''' Handle any exception and call handlers '''
+        error_id = self._db.store_error(*sys.exc_info())
         self._db.expire(datetime.now() - self.expire)
-        raise error
+        return self.handle_error(error, error_id)
+
+    def handle_error(self, error, error_id):
+        ''' Call best handlers until one returns '''
+
+        def class_distance(cls):
+            ''' Get inheritance level '''
+            return type(error).mro().index(cls)
+
+        valid_handlers = [cls for cls in self._handlers.keys() if isinstance(error, cls)]
+        best_handlers = sorted(valid_handlers, key=class_distance)
+
+        # Call handlers until one passes
+        for cls in best_handlers:
+            try:
+                handler = self._handlers[cls]
+                self._db.store_handler_call(handler.__name__, error_id)
+                return handler(error)
+            except type(error):
+                continue
+
+        # Default to InternalServerError (like flask)
+        self._db.store_handler_call('InternalServerError', error_id)
+        return InternalServerError()
 
     def api(self):
         '''
@@ -148,7 +188,7 @@ class ErrorDb:
 
         sqlcheck = "SELECT name FROM sqlite_master WHERE type='table' AND name='errors'"
         sqlcreate = 'CREATE TABLE errors(id integer primary key, timestamp timestamp, \
-                                         type text, value text, traceback text)'
+                                         type text, value text, traceback text, handlers text)'
 
         cursor.execute(sqlcheck)
         if not cursor.fetchall():
@@ -160,8 +200,23 @@ class ErrorDb:
         traceback_io = io.StringIO()
         traceback.print_tb(exc_traceback, file=traceback_io)
         values = (datetime.now(), exc_type.__name__, str(exc_value), traceback_io.getvalue())
-        sql_insert = 'INSERT INTO errors VALUES (NULL, ?, ?, ?, ?)'
+
+        sql_insert = 'INSERT INTO errors VALUES (NULL, ?, ?, ?, ?, "[]")'
         cursor.execute(sql_insert, values)
+
+        # This is not safe with race conditions
+        return cursor.lastrowid
+
+    @_cursor
+    def store_handler_call(self, cursor, handler_name, error_id):
+        sql = 'UPDATE errors SET handlers = ? WHERE id = ?'
+
+        error = self.get_error(error_id)
+        handlers = error['handlers']
+        handlers.append(handler_name)
+
+        cursor.execute(sql, (json.dumps(handlers), error_id))
+
 
     @_cursor
     def get_errors(self, cursor, limit=10):
@@ -180,13 +235,14 @@ class ErrorDb:
 
     def _build_json(self, row):
         ''' return a json obj from a row result '''
-        key, timestamp, exc_type, value, traceback = row
+        key, timestamp, exc_type, value, traceback, handlers = row
         return {
             'id': key,
             'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             'type': exc_type,
             'value': value,
             'traceback': traceback,
+            'handlers': json.loads(handlers),
         }
 
     @_cursor

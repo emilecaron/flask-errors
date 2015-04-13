@@ -10,6 +10,7 @@
         <th>time</th>
         <th>type</th>
         <th>value</th>
+        <th>handlers called</th>
     </tr>
     {% for error in errors %}
     <tr onclick="document.location = '/errors_ui/error/{{ error.id }}';">
@@ -17,6 +18,13 @@
         <td>{{ error.timestamp }}</td>
         <td>{{ error.type }}</td>
         <td>{{ error.value }}</td>
+        <td>
+            {% for handler in error.handlers %}
+            <font color="{% if loop.last %}green{% else %}red{% endif %}">
+            {{ handler }}
+            </font>
+            {% endfor %}
+        </td>
     </tr>
     {% endfor %}
 </table>
