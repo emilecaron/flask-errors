@@ -102,7 +102,7 @@ class FlaskError:
 
         valid_handlers = [cls for cls in self._handlers.keys() if isinstance(error, cls)]
         best_handlers = sorted(valid_handlers, key=class_distance)
-        print('BEST HANDLERS', bast_handlers)
+        print('BEST HANDLERS', best_handlers)
 
         # Call handlers until one passes
         for cls in best_handlers:
