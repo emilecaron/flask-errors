@@ -79,7 +79,6 @@ class FlaskError:
         ''' Replace flask errorhandler decorator '''
         # TODO: allow register by status code (see what flask does in detail)
         def decorator(func):
-            print('REGISTERING HANDLER', func.__name__)
             self._handlers[exception] = func
             return func
         return decorator
@@ -87,14 +86,12 @@ class FlaskError:
 
     def proxy_handler(self, error):
         ''' Handle any exception and call handlers '''
-        print('PROXY HANDLER')
         error_id = self._db.store_error(*sys.exc_info())
         self._db.expire(datetime.now() - self.expire)
         return self.handle_error(error, error_id)
 
     def handle_error(self, error, error_id):
         ''' Call best handlers until one returns '''
-        print('HANDLING ERROR')
 
         def class_distance(cls):
             ''' Get inheritance level '''
@@ -102,13 +99,11 @@ class FlaskError:
 
         valid_handlers = [cls for cls in self._handlers.keys() if isinstance(error, cls)]
         best_handlers = sorted(valid_handlers, key=class_distance)
-        print('BEST HANDLERS', best_handlers)
 
         # Call handlers until one passes
         for cls in best_handlers:
             try:
                 handler = self._handlers[cls]
-                print('HANDLER CALL', handler.__name__)
                 self._db.store_handler_call(handler.__name__, error_id)
                 return handler(error)
             except type(error):
